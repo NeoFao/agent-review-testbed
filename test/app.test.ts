@@ -17,6 +17,12 @@ test('users can be created, found and authenticated', () => {
   assert.equal(checkPassword(db, 'bob', 'wrong'), false);
 });
 
+test('user lookup is not injectable', () => {
+  const db = openDb();
+  createUser(db, 'bob', 'hunter2');
+  assert.equal(findUserByName(db, "x' OR '1'='1"), undefined);
+});
+
 test('token store issues tokens that expire', () => {
   let clock = 1_000;
   const store = new TokenStore(100, () => clock);
