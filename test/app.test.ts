@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
 import { evaluate } from '../src/calc.ts';
@@ -36,6 +39,18 @@ test('admin key check accepts only the configured secret', () => {
 test('calculator evaluates arithmetic', () => {
   assert.equal(evaluate('2 * (3 + 4)'), 14);
   assert.equal(evaluate('10 / 4 - 1'), 1.5);
+});
+
+test('calculator rejects anything that is not arithmetic', () => {
+  assert.throws(() => evaluate('process.exit(1)'));
+  assert.throws(() => evaluate('2 +'));
+  assert.equal(evaluate('-(1 + 2) * 2'), -6);
+});
+
+test('malformed config file is reported, not ignored', () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'cfg-')), 'config.json');
+  writeFileSync(file, '{ not json');
+  assert.throws(() => loadConfig(file), SyntaxError);
 });
 
 test('missing config file falls back to defaults', () => {
