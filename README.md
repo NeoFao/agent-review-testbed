@@ -22,7 +22,7 @@ Requires Node.js 24 or later (native TypeScript type stripping).
 
 ```bash
 npm test     # node --test, no install step
-npm start    # listens on :8080
+DEMO_API_SECRET=change-me npm start   # listens on :8080
 ```
 
 Optional type check: `npx -p typescript -p @types/node tsc`.
