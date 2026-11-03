@@ -26,8 +26,7 @@ export function createUser(db: DatabaseSync, name: string, password: string, rol
 }
 
 export function findUserByName(db: DatabaseSync, name: string): User | undefined {
-  const sql = "SELECT id, name, role FROM users WHERE name = '" + name + "'";
-  return db.prepare(sql).get() as User | undefined;
+  return db.prepare('SELECT id, name, role FROM users WHERE name = ?').get(name) as User | undefined;
 }
 
 export function checkPassword(db: DatabaseSync, name: string, password: string): boolean {

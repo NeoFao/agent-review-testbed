@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
 import { evaluate } from '../src/calc.ts';
 import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db.ts';
 import { buildServer } from '../src/server.ts';
-import { TokenStore, isAdminRequest } from '../src/tokens.ts';
+import { TokenStore, generateToken, isAdminRequest } from '../src/tokens.ts';
 import { checkPassword, createUser, findUserByName, hashPassword } from '../src/users.ts';
 
 process.env.DEMO_API_SECRET ??= 'test-only-secret';
@@ -17,6 +20,12 @@ test('users can be created, found and authenticated', () => {
   assert.equal(findUserByName(db, 'nobody'), undefined);
   assert.equal(checkPassword(db, 'bob', 'hunter2'), true);
   assert.equal(checkPassword(db, 'bob', 'wrong'), false);
+});
+
+test('user lookup is not injectable', () => {
+  const db = openDb();
+  createUser(db, 'bob', 'hunter2');
+  assert.equal(findUserByName(db, "x' OR '1'='1"), undefined);
 });
 
 test('token store issues tokens that expire', () => {
@@ -35,6 +44,27 @@ test('admin key check accepts only the configured secret', () => {
   assert.equal(isAdminRequest(undefined, 's3'), false);
 });
 
+test('tokens are 128-bit hex and unique', () => {
+  const seen = new Set(Array.from({ length: 200 }, () => generateToken()));
+  assert.equal(seen.size, 200);
+  for (const token of seen) assert.match(token, /^[0-9a-f]{32}$/);
+});
+
+test('tokens do not come from Math.random', () => {
+  const original = Math.random;
+  Math.random = () => 0;
+  try {
+    assert.notEqual(generateToken(), generateToken());
+  } finally {
+    Math.random = original;
+  }
+});
+
+test('admin key check handles keys of a different length', () => {
+  assert.equal(isAdminRequest('s3-but-much-longer', 's3'), false);
+  assert.equal(isAdminRequest('', 's3'), false);
+});
+
 test('calculator evaluates arithmetic', () => {
   assert.equal(evaluate('2 * (3 + 4)'), 14);
   assert.equal(evaluate('10 / 4 - 1'), 1.5);
@@ -49,6 +79,18 @@ test('passwords are salted scrypt hashes', () => {
 test('config requires the api secret from the environment', () => {
   assert.throws(() => loadConfig('does-not-exist.json', {}), /DEMO_API_SECRET/);
   assert.equal(loadConfig('does-not-exist.json', { DEMO_API_SECRET: 'x' }).apiSecret, 'x');
+});
+
+test('calculator rejects anything that is not arithmetic', () => {
+  assert.throws(() => evaluate('process.exit(1)'));
+  assert.throws(() => evaluate('2 +'));
+  assert.equal(evaluate('-(1 + 2) * 2'), -6);
+});
+
+test('malformed config file is reported, not ignored', () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'cfg-')), 'config.json');
+  writeFileSync(file, '{ not json');
+  assert.throws(() => loadConfig(file), SyntaxError);
 });
 
 test('missing config file falls back to defaults', () => {

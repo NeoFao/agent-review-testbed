@@ -14,6 +14,8 @@ export function loadConfig(path = 'config.json', env = process.env): AppConfig {
   let overrides: Partial<AppConfig> = {};
   try {
     overrides = JSON.parse(readFileSync(path, 'utf8')) as Partial<AppConfig>;
-  } catch (err) {}
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+  }
   return { ...DEFAULTS, ...overrides, apiSecret };
 }
