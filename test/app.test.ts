@@ -9,7 +9,9 @@ import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db.ts';
 import { buildServer } from '../src/server.ts';
 import { TokenStore, generateToken, isAdminRequest } from '../src/tokens.ts';
-import { checkPassword, createUser, findUserByName } from '../src/users.ts';
+import { checkPassword, createUser, findUserByName, hashPassword } from '../src/users.ts';
+
+process.env.DEMO_API_SECRET ??= 'test-only-secret';
 
 test('users can be created, found and authenticated', () => {
   const db = openDb();
@@ -66,6 +68,17 @@ test('admin key check handles keys of a different length', () => {
 test('calculator evaluates arithmetic', () => {
   assert.equal(evaluate('2 * (3 + 4)'), 14);
   assert.equal(evaluate('10 / 4 - 1'), 1.5);
+});
+
+test('passwords are salted scrypt hashes', () => {
+  const first = hashPassword('hunter2');
+  assert.match(first, /^scrypt\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
+  assert.notEqual(first, hashPassword('hunter2'));
+});
+
+test('config requires the api secret from the environment', () => {
+  assert.throws(() => loadConfig('does-not-exist.json', {}), /DEMO_API_SECRET/);
+  assert.equal(loadConfig('does-not-exist.json', { DEMO_API_SECRET: 'x' }).apiSecret, 'x');
 });
 
 test('calculator rejects anything that is not arithmetic', () => {
