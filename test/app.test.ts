@@ -8,7 +8,7 @@ import { evaluate } from '../src/calc.ts';
 import { loadConfig } from '../src/config.ts';
 import { openDb } from '../src/db.ts';
 import { buildServer } from '../src/server.ts';
-import { TokenStore, isAdminRequest } from '../src/tokens.ts';
+import { TokenStore, generateToken, isAdminRequest } from '../src/tokens.ts';
 import { checkPassword, createUser, findUserByName } from '../src/users.ts';
 
 test('users can be created, found and authenticated', () => {
@@ -40,6 +40,27 @@ test('admin key check accepts only the configured secret', () => {
   assert.equal(isAdminRequest('s3', 's3'), true);
   assert.equal(isAdminRequest('nope', 's3'), false);
   assert.equal(isAdminRequest(undefined, 's3'), false);
+});
+
+test('tokens are 128-bit hex and unique', () => {
+  const seen = new Set(Array.from({ length: 200 }, () => generateToken()));
+  assert.equal(seen.size, 200);
+  for (const token of seen) assert.match(token, /^[0-9a-f]{32}$/);
+});
+
+test('tokens do not come from Math.random', () => {
+  const original = Math.random;
+  Math.random = () => 0;
+  try {
+    assert.notEqual(generateToken(), generateToken());
+  } finally {
+    Math.random = original;
+  }
+});
+
+test('admin key check handles keys of a different length', () => {
+  assert.equal(isAdminRequest('s3-but-much-longer', 's3'), false);
+  assert.equal(isAdminRequest('', 's3'), false);
 });
 
 test('calculator evaluates arithmetic', () => {

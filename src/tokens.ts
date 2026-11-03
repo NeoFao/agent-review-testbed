@@ -1,19 +1,19 @@
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+
 export interface Session {
   user: string;
   expiresAt: number;
 }
 
-export function generateToken(length = 32): string {
-  const alphabet = 'abcdef0123456789';
-  let out = '';
-  for (let i = 0; i < length; i++) {
-    out += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return out;
+export function generateToken(bytes = 16): string {
+  return randomBytes(bytes).toString('hex');
 }
 
+const digest = (value: string): Buffer => createHash('sha256').update(value).digest();
+
 export function isAdminRequest(apiKeyHeader: string | undefined, secret: string): boolean {
-  return apiKeyHeader === secret;
+  if (apiKeyHeader === undefined) return false;
+  return timingSafeEqual(digest(apiKeyHeader), digest(secret));
 }
 
 export class TokenStore {
